@@ -1,32 +1,32 @@
 # Fridge → Recipe → Bring! (GitHub Pages)
 
 Client-side web app that:
-1. Takes a fridge photo
-2. Detects ingredients with OpenAI vision
-3. Picks an evening recipe
+1. Takes **multiple** fridge photos
+2. Detects likely ingredients fully in-browser (TensorFlow.js + COCO-SSD)
+3. Finds a dinner recipe (TheMealDB, no API key)
 4. Computes missing ingredients
 5. Tries to add missing items to Bring! (unofficial API)
 
-## Important caveats
+## Key points
 
-- This is **frontend-only** (GitHub Pages compatible).
-- API keys/credentials are stored in `localStorage` on the same browser profile.
-- Bring! uses an unofficial API and may break anytime.
+- Works on GitHub Pages (static hosting).
+- No OpenAI key required for image detection/recipe lookup.
+- Bring! integration is unofficial and may break anytime.
 - Browser CORS may block Bring requests depending on their current policy.
+
+## How detection works
+
+- Uses COCO-SSD object detection in browser.
+- Maps detected classes (e.g., `apple`, `banana`, `broccoli`) to ingredient names.
+- Lets you manually edit the detected ingredient list before searching recipes.
 
 ## Run locally
 
-Just open `index.html` in a browser.
+Open `index.html` in a browser.
 
-For camera capture on mobile, host over HTTPS (GitHub Pages is HTTPS by default).
+For camera capture on mobile, host over HTTPS (GitHub Pages already is HTTPS).
 
 ## Deploy to GitHub Pages
 
-- Push this folder to a repo.
-- In GitHub: Settings → Pages → Deploy from branch (root).
-
-## Suggested hardening (optional)
-
-If you want this to be robust, keep UI on Pages but move integrations to a tiny backend:
-- OpenAI calls from backend (protect key)
-- Bring auth/calls from backend (avoid CORS and login leakage)
+- Push this folder to a repo
+- In GitHub: Settings → Pages → Deploy from branch (`main`, root)

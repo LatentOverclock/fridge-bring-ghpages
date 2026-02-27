@@ -1,126 +1,208 @@
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  imageDataUrl: null,
+  imageDataUrls: [],
   fridgeIngredients: [],
   recipe: null,
   missing: [],
+  model: null,
+};
+
+const FOOD_CLASS_MAP = {
+  banana: ["banana"],
+  apple: ["apple"],
+  orange: ["orange"],
+  broccoli: ["broccoli"],
+  carrot: ["carrot"],
+  sandwich: ["bread", "cheese", "ham"],
+  pizza: ["pizza"],
+  donut: ["donut"],
+  cake: ["cake"],
+  hotdog: ["sausage", "bun"],
+  "hot dog": ["sausage", "bun"],
+  bottle: ["bottle"],
+  bowl: ["bowl"],
+  cup: ["cup"],
+  "wine glass": ["wine"],
 };
 
 function log(msg) {
   $("status").textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
 }
 
+function normalize(s) {
+  return (s || "")
+    .toLowerCase()
+    .replace(/\(.+?\)/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim();
+}
+
+function unique(arr) {
+  return [...new Set(arr.map((x) => normalize(x)).filter(Boolean))];
+}
+
 function loadSettings() {
-  ["openaiKey", "model", "bringEmail", "bringPassword", "bringListUuid"].forEach((k) => {
+  ["bringEmail", "bringPassword", "bringListUuid"].forEach((k) => {
     const v = localStorage.getItem(`fridgeApp.${k}`);
     if (v) $(k).value = v;
   });
 }
 
 function saveSettings() {
-  ["openaiKey", "model", "bringEmail", "bringPassword", "bringListUuid"].forEach((k) => {
+  ["bringEmail", "bringPassword", "bringListUuid"].forEach((k) => {
     localStorage.setItem(`fridgeApp.${k}`, $(k).value.trim());
   });
   log("Settings saved.");
 }
 
-async function openAIJson({ system, user }) {
-  const key = $("openaiKey").value.trim();
-  if (!key) throw new Error("Missing OpenAI key.");
+function renderPreviews() {
+  const grid = $("previewGrid");
+  grid.innerHTML = "";
+  for (const url of state.imageDataUrls) {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "Fridge preview";
+    img.className = "preview-thumb";
+    grid.appendChild(img);
+  }
+}
 
-  const model = $("model").value.trim() || "gpt-4.1-mini";
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
+function dataUrlToImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
   });
+}
 
-  if (!res.ok) throw new Error(`OpenAI error: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return JSON.parse(data.choices[0].message.content);
+async function ensureModel() {
+  if (state.model) return state.model;
+  if (!window.cocoSsd) throw new Error("COCO-SSD library not loaded.");
+  log("Loading browser ML model (first run can take a bit)...");
+  state.model = await window.cocoSsd.load({ base: "lite_mobilenet_v2" });
+  return state.model;
+}
+
+function ingredientsFromPredictions(predictions) {
+  const out = [];
+  for (const p of predictions) {
+    if ((p.score || 0) < 0.4) continue;
+    const label = normalize(p.class);
+    const mapped = FOOD_CLASS_MAP[label];
+    if (mapped) out.push(...mapped);
+  }
+  return out;
 }
 
 async function analyzeFridge() {
-  if (!state.imageDataUrl) return;
-  log("Analyzing fridge image...");
+  if (!state.imageDataUrls.length) return;
 
-  const key = $("openaiKey").value.trim();
-  if (!key) throw new Error("Set OpenAI key first.");
+  const model = await ensureModel();
+  const allIngredients = [];
 
-  const model = $("model").value.trim() || "gpt-4.1-mini";
+  log(`Analyzing ${state.imageDataUrls.length} image(s)...`);
+  for (let i = 0; i < state.imageDataUrls.length; i++) {
+    const img = await dataUrlToImage(state.imageDataUrls[i]);
+    const predictions = await model.detect(img, 20);
+    allIngredients.push(...ingredientsFromPredictions(predictions));
+    log(`Analyzed image ${i + 1}/${state.imageDataUrls.length}`);
+  }
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You detect likely edible ingredients in fridge photos. Return strict JSON: {ingredients: string[]} using singular nouns and simple names. Keep confidence-safe guesses only.",
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "List visible fridge ingredients." },
-            { type: "image_url", image_url: { url: state.imageDataUrl } },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) throw new Error(`Vision error: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  const parsed = JSON.parse(data.choices[0].message.content);
-  state.fridgeIngredients = (parsed.ingredients || []).map((s) => s.trim()).filter(Boolean);
-
-  log(`Detected ${state.fridgeIngredients.length} ingredients: ${state.fridgeIngredients.join(", ") || "none"}`);
+  state.fridgeIngredients = unique(allIngredients);
+  $("ingredientsInput").value = state.fridgeIngredients.join(", ");
   $("findRecipeBtn").disabled = !state.fridgeIngredients.length;
+
+  log(
+    `Detected ${state.fridgeIngredients.length} ingredient(s): ${
+      state.fridgeIngredients.join(", ") || "none"
+    }`
+  );
+}
+
+function getIngredientsFromInput() {
+  const raw = $("ingredientsInput").value;
+  state.fridgeIngredients = unique(raw.split(/[\n,]/g).map((s) => s.trim()));
+  return state.fridgeIngredients;
+}
+
+async function fetchMealIdsForIngredient(ingredient) {
+  const res = await fetch(
+    `https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(ingredient)}`
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.meals || []).map((m) => m.idMeal);
+}
+
+async function fetchMealDetails(idMeal) {
+  const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${encodeURIComponent(idMeal)}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.meals?.[0] || null;
+}
+
+function mealToRecipe(meal) {
+  const ingredients = [];
+  for (let i = 1; i <= 20; i++) {
+    const name = (meal[`strIngredient${i}`] || "").trim();
+    const amount = (meal[`strMeasure${i}`] || "").trim();
+    if (name) ingredients.push({ name, amount });
+  }
+
+  const instructions = (meal.strInstructions || "")
+    .split(/\r?\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return {
+    title: meal.strMeal,
+    servings: 2,
+    ingredients,
+    instructions,
+    why_fit: "Selected from recipes matching your detected fridge ingredients.",
+    source_url: meal.strSource || meal.strYoutube || "",
+  };
+}
+
+function scoreMeal(recipe, haveIngredients) {
+  const have = new Set(haveIngredients.map(normalize));
+  let overlap = 0;
+  for (const item of recipe.ingredients) {
+    if (have.has(normalize(item.name))) overlap += 1;
+  }
+  return overlap;
 }
 
 async function findRecipe() {
-  if (!state.fridgeIngredients.length) return;
-  log("Finding recipe...");
+  const ingredients = getIngredientsFromInput();
+  if (!ingredients.length) throw new Error("No ingredients found. Add or edit detected ingredients first.");
 
-  const parsed = await openAIJson({
-    system:
-      "You are a practical recipe planner. Return strict JSON: {title:string, servings:number, ingredients:[{name:string, amount:string}], instructions:string[], why_fit:string}",
-    user: `Available ingredients: ${state.fridgeIngredients.join(", ")}.\nGoal: one good dinner recipe for tonight that uses as many available ingredients as possible while staying realistic.`,
-  });
+  log("Searching recipe candidates...");
 
-  state.recipe = parsed;
-  $("recipe").textContent = JSON.stringify(parsed, null, 2);
+  const topIngredients = ingredients.slice(0, 6);
+  const idLists = await Promise.all(topIngredients.map(fetchMealIdsForIngredient));
+  const idSet = new Set(idLists.flat().filter(Boolean));
+
+  if (!idSet.size) throw new Error("No recipes found from detected ingredients.");
+
+  const candidateIds = [...idSet].slice(0, 20);
+  const meals = (await Promise.all(candidateIds.map(fetchMealDetails))).filter(Boolean);
+  if (!meals.length) throw new Error("Could not load recipe details.");
+
+  const recipes = meals.map(mealToRecipe);
+  recipes.sort((a, b) => scoreMeal(b, ingredients) - scoreMeal(a, ingredients));
+
+  state.recipe = recipes[0];
+  $("recipe").textContent = JSON.stringify(state.recipe, null, 2);
   $("computeMissingBtn").disabled = false;
-  log(`Recipe ready: ${parsed.title}`);
-}
-
-function normalize(s) {
-  return s.toLowerCase().replace(/\(.+?\)/g, "").replace(/[^a-z0-9\s-]/g, "").trim();
+  log(`Recipe ready: ${state.recipe.title}`);
 }
 
 function computeMissing() {
   if (!state.recipe?.ingredients) return;
-  const have = new Set(state.fridgeIngredients.map(normalize));
+  const have = new Set(getIngredientsFromInput().map(normalize));
   state.missing = state.recipe.ingredients.filter((i) => !have.has(normalize(i.name)));
 
   const ul = $("missingList");
@@ -195,18 +277,25 @@ function bindEvents() {
   $("saveSettings").addEventListener("click", saveSettings);
 
   $("photoInput").addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      state.imageDataUrl = reader.result;
-      $("preview").src = state.imageDataUrl;
-      $("preview").hidden = false;
-      $("analyzeBtn").disabled = false;
-      log("Photo loaded.");
-    };
-    reader.readAsDataURL(file);
+    const urls = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    state.imageDataUrls = urls;
+    renderPreviews();
+    $("analyzeBtn").disabled = false;
+    log(`${urls.length} photo(s) loaded.`);
   });
 
   $("analyzeBtn").addEventListener("click", () => analyzeFridge().catch((e) => log(`Error: ${e.message}`)));

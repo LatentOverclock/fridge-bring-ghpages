@@ -9,16 +9,10 @@
   <body>
     <main class="container">
       <h1>Fridge → Recipe → Bring!</h1>
-      <p class="muted">Client-side demo for GitHub Pages (keys saved in localStorage).</p>
+      <p class="muted">GitHub Pages app with client-side fridge image detection (no OpenAI key needed).</p>
 
       <section class="card">
         <h2>1) Settings</h2>
-        <label>OpenAI API Key
-          <input id="openaiKey" type="password" placeholder="sk-..." />
-        </label>
-        <label>Model
-          <input id="model" type="text" value="gpt-4.1-mini" />
-        </label>
         <details>
           <summary>Bring! (unofficial)</summary>
           <label>Bring Email
@@ -30,26 +24,31 @@
           <label>Bring List UUID
             <input id="bringListUuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           </label>
-          <p class="muted small">If Bring calls fail (likely CORS/auth changes), app will still show copy-ready shopping list.</p>
+          <p class="muted small">If Bring calls fail (CORS/auth changes), app still gives copy-ready shopping list.</p>
         </details>
         <button id="saveSettings">Save Settings</button>
       </section>
 
       <section class="card">
-        <h2>2) Morning fridge photo</h2>
-        <input id="photoInput" type="file" accept="image/*" capture="environment" />
-        <img id="preview" alt="Fridge preview" hidden />
-        <button id="analyzeBtn" disabled>Analyze Fridge</button>
+        <h2>2) Morning fridge photos (multiple)</h2>
+        <input id="photoInput" type="file" accept="image/*" capture="environment" multiple />
+        <div id="previewGrid" class="preview-grid"></div>
+        <button id="analyzeBtn" disabled>Analyze Fridge Photos (Browser ML)</button>
       </section>
 
       <section class="card">
-        <h2>3) Evening recipe</h2>
+        <h2>3) Detected ingredients (edit if needed)</h2>
+        <textarea id="ingredientsInput" rows="5" placeholder="Detected ingredients will appear here..."></textarea>
+      </section>
+
+      <section class="card">
+        <h2>4) Evening recipe</h2>
         <button id="findRecipeBtn" disabled>Find Recipe from Ingredients</button>
         <pre id="recipe"></pre>
       </section>
 
       <section class="card">
-        <h2>4) Missing ingredients</h2>
+        <h2>5) Missing ingredients</h2>
         <button id="computeMissingBtn" disabled>Compute Missing</button>
         <ul id="missingList"></ul>
         <div class="row">
@@ -64,6 +63,8 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>
