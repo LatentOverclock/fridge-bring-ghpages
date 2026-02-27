@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fridge → Recipe → Bring!</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Fridge → Recipe → Bring!</h1>
+      <p class="muted">Client-side demo for GitHub Pages (keys saved in localStorage).</p>
+
+      <section class="card">
+        <h2>1) Settings</h2>
+        <label>OpenAI API Key
+          <input id="openaiKey" type="password" placeholder="sk-..." />
+        </label>
+        <label>Model
+          <input id="model" type="text" value="gpt-4.1-mini" />
+        </label>
+        <details>
+          <summary>Bring! (unofficial)</summary>
+          <label>Bring Email
+            <input id="bringEmail" type="email" placeholder="you@example.com" />
+          </label>
+          <label>Bring Password
+            <input id="bringPassword" type="password" placeholder="••••••••" />
+          </label>
+          <label>Bring List UUID
+            <input id="bringListUuid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          </label>
+          <p class="muted small">If Bring calls fail (likely CORS/auth changes), app will still show copy-ready shopping list.</p>
+        </details>
+        <button id="saveSettings">Save Settings</button>
+      </section>
+
+      <section class="card">
+        <h2>2) Morning fridge photo</h2>
+        <input id="photoInput" type="file" accept="image/*" capture="environment" />
+        <img id="preview" alt="Fridge preview" hidden />
+        <button id="analyzeBtn" disabled>Analyze Fridge</button>
+      </section>
+
+      <section class="card">
+        <h2>3) Evening recipe</h2>
+        <button id="findRecipeBtn" disabled>Find Recipe from Ingredients</button>
+        <pre id="recipe"></pre>
+      </section>
+
+      <section class="card">
+        <h2>4) Missing ingredients</h2>
+        <button id="computeMissingBtn" disabled>Compute Missing</button>
+        <ul id="missingList"></ul>
+        <div class="row">
+          <button id="addToBringBtn" disabled>Add Missing to Bring!</button>
+          <button id="copyBtn" disabled>Copy Missing List</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Status</h2>
+        <pre id="status">Ready.</pre>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
