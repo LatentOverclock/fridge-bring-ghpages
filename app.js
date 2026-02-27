@@ -24,6 +24,30 @@ const FOOD_CLASS_MAP = {
   bowl: ["bowl"],
   cup: ["cup"],
   "wine glass": ["wine"],
+
+  // Custom label map / heuristics for common fridge produce that models confuse
+  cucumber: ["cucumber", "zucchini"],
+  squash: ["zucchini"],
+  eggplant: ["eggplant"],
+  aubergine: ["eggplant"],
+  pepper: ["bell pepper"],
+  tomato: ["tomato"],
+  onion: ["onion"],
+  garlic: ["garlic"],
+  potato: ["potato"],
+  mushroom: ["mushroom"],
+};
+
+// Canonical ingredient aliases (helps manual edits + recipe/missing matching)
+const INGREDIENT_ALIASES = {
+  courgette: "zucchini",
+  zucchinis: "zucchini",
+  courgettes: "zucchini",
+  aubergine: "eggplant",
+  aubergines: "eggplant",
+  chilies: "chili",
+  chillies: "chili",
+  peppers: "bell pepper",
 };
 
 function log(msg) {
@@ -38,8 +62,13 @@ function normalize(s) {
     .trim();
 }
 
+function canonicalIngredient(name) {
+  const n = normalize(name);
+  return INGREDIENT_ALIASES[n] || n;
+}
+
 function unique(arr) {
-  return [...new Set(arr.map((x) => normalize(x)).filter(Boolean))];
+  return [...new Set(arr.map((x) => canonicalIngredient(x)).filter(Boolean))];
 }
 
 function loadSettings() {

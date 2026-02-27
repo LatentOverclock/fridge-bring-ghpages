@@ -18,6 +18,7 @@ Client-side web app that:
 
 - Uses COCO-SSD object detection in browser.
 - Maps detected classes (e.g., `apple`, `banana`, `broccoli`) to ingredient names.
+- Includes a custom produce mapping/alias layer (e.g., courgette → zucchini, aubergine → eggplant) to improve matching.
 - Lets you manually edit the detected ingredient list before searching recipes.
 
 ## Run locally
